@@ -22,15 +22,67 @@ extension TimingAppData {
     public mutating func merge(with delta: TimingAppData) {
         for (car, newLine) in delta.lines {
             if var existing = lines[car] {
-                if let v = newLine.racingNumber { existing.racingNumber = v }
-                if let v = newLine.line { existing.line = v }
-                if let v = newLine.gridPos { existing.gridPos = v }
-                if let v = newLine.stints { existing.stints = v }
+                existing.merge(with: newLine)
                 lines[car] = existing
             } else {
                 lines[car] = newLine
             }
         }
+    }
+}
+
+extension TimingAppDataLine {
+    mutating func merge(with delta: TimingAppDataLine) {
+        if let racingNumber = delta.racingNumber { self.racingNumber = racingNumber }
+        if let line = delta.line { self.line = line }
+        if let gridPos = delta.gridPos { self.gridPos = gridPos }
+        if let deltaStints = delta.stints {
+            if var existingStints = stints {
+                existingStints.merge(with: deltaStints)
+                stints = existingStints
+            } else {
+                stints = deltaStints
+            }
+        }
+    }
+}
+
+extension TimingAppDataLineStint {
+    mutating func merge(with delta: TimingAppDataLineStint) {
+        var merged = dictionary
+        for (key, deltaStint) in delta.dictionary {
+            if let existingStint = merged[key] {
+                merged[key] = existingStint.merging(deltaStint)
+            } else {
+                merged[key] = deltaStint
+            }
+        }
+
+        self = .dictionary(merged)
+    }
+
+    var dictionary: [String: LineStint] {
+        switch self {
+        case .array(let array):
+            return Dictionary(uniqueKeysWithValues: array.enumerated().map { (String($0.offset), $0.element) })
+        case .dictionary(let dictionary):
+            return dictionary
+        }
+    }
+}
+
+extension LineStint {
+    func merging(_ delta: LineStint) -> LineStint {
+        LineStint(
+            lapFlags: delta.lapFlags ?? lapFlags,
+            compound: delta.compound ?? compound,
+            new: delta.new ?? new,
+            tyresNotChanged: delta.tyresNotChanged ?? tyresNotChanged,
+            totalLaps: delta.totalLaps ?? totalLaps,
+            startLaps: delta.startLaps ?? startLaps,
+            lapTime: delta.lapTime ?? lapTime,
+            lapNumber: delta.lapNumber ?? lapNumber
+        )
     }
 }
 

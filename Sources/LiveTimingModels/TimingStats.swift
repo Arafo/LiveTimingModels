@@ -33,8 +33,8 @@ extension TimingStats {
 extension TimingStats {
     public mutating func merge(with delta: TimingStats) {
         for (stat, newLine) in delta.lines {
-            if lines[stat] != nil {
-                lines[stat] = newLine
+            if let existing = lines[stat] {
+                lines[stat] = existing.merging(newLine)
             } else {
                 lines[stat] = newLine
             }
@@ -55,6 +55,44 @@ public struct TimingStatsLine: Codable, Sendable {
         case personalBestLapTime = "PersonalBestLapTime"
         case bestSectors = "BestSectors"
         case bestSpeeds = "BestSpeeds"
+    }
+}
+
+extension TimingStatsLine {
+    func merging(_ delta: TimingStatsLine) -> TimingStatsLine {
+        TimingStatsLine(
+            line: delta.line ?? line,
+            racingNumber: delta.racingNumber ?? racingNumber,
+            personalBestLapTime: personalBestLapTime?.merging(delta.personalBestLapTime) ?? delta.personalBestLapTime,
+            bestSectors: bestSectors?.merging(delta.bestSectors) ?? delta.bestSectors,
+            bestSpeeds: bestSpeeds?.merging(delta.bestSpeeds) ?? delta.bestSpeeds
+        )
+    }
+}
+
+extension TimingStatsLineBestSector {
+    func merging(_ delta: TimingStatsLineBestSector?) -> TimingStatsLineBestSector {
+        guard let delta else { return self }
+
+        var merged = dictionary
+        for (key, deltaSector) in delta.dictionary {
+            if let existingSector = merged[key] {
+                merged[key] = existingSector.merging(deltaSector)
+            } else {
+                merged[key] = deltaSector
+            }
+        }
+
+        return .dictionary(merged)
+    }
+
+    var dictionary: [String: BestSector] {
+        switch self {
+        case .array(let array):
+            Dictionary(uniqueKeysWithValues: array.enumerated().map { (String($0.offset), $0.element) })
+        case .dictionary(let dictionary):
+            dictionary
+        }
     }
 }
 
@@ -100,6 +138,17 @@ public struct BestSector: Codable, Sendable {
     }
 }
 
+extension BestSector {
+    func merging(_ delta: BestSector?) -> BestSector {
+        guard let delta else { return self }
+
+        return BestSector(
+            value: delta.value ?? value,
+            position: delta.position ?? position
+        )
+    }
+}
+
 public struct BestSpeeds: Codable, Sendable {
     public let i1: BestSector?
     public let i2: BestSector?
@@ -114,6 +163,19 @@ public struct BestSpeeds: Codable, Sendable {
     }
 }
 
+extension BestSpeeds {
+    func merging(_ delta: BestSpeeds?) -> BestSpeeds {
+        guard let delta else { return self }
+
+        return BestSpeeds(
+            i1: i1?.merging(delta.i1) ?? delta.i1,
+            i2: i2?.merging(delta.i2) ?? delta.i2,
+            fl: fl?.merging(delta.fl) ?? delta.fl,
+            st: st?.merging(delta.st) ?? delta.st
+        )
+    }
+}
+
 public struct PersonalBestLapTime: Codable, Sendable {
     public let value: String?
     public let lap: Int?
@@ -123,5 +185,17 @@ public struct PersonalBestLapTime: Codable, Sendable {
         case value = "Value"
         case lap = "Lap"
         case position = "Position"
+    }
+}
+
+extension PersonalBestLapTime {
+    func merging(_ delta: PersonalBestLapTime?) -> PersonalBestLapTime {
+        guard let delta else { return self }
+
+        return PersonalBestLapTime(
+            value: delta.value ?? value,
+            lap: delta.lap ?? lap,
+            position: delta.position ?? position
+        )
     }
 }
